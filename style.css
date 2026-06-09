@@ -37,11 +37,32 @@ body { background-color: var(--bg-color); color: var(--text-color); height: 100v
 .sidebar { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .sidebar h2 { font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
-#report-list { list-style: none; margin-top: 15px; overflow-y: auto; flex-grow: 1; }
-#report-list li { padding: 12px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; background: var(--bg-color); transition: all 0.2s; border: 1px solid transparent; position: relative;}
+#report-list { list-style: none; margin-top: 10px; overflow-y: auto; flex-grow: 1; }
+#report-list li {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    background: var(--bg-color);
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    position: relative;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#report-list li span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 20px;
+}
 #report-list li:hover { background: var(--list-hover); border-color: var(--primary-color); }
 #report-list li.active { background: var(--primary-color); color: white; }
-.delete-btn { position: absolute; right: 10px; top: 12px; background: none; border: none; color: #ef4444; cursor: pointer; display: none; }
+.delete-btn { position: absolute; right: 8px; top: 8px; background: none; border: none; color: #ef4444; cursor: pointer; display: none; }
 #report-list li:hover .delete-btn, #report-list li:focus-within .delete-btn { display: block; }
 #report-list li.active .delete-btn { color: white; }
 

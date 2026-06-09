@@ -95,7 +95,9 @@ function init() {
 // 渲染左側列表
 function renderReportList() {
     reportList.innerHTML = '';
-    reports.sort((a, b) => b.updatedAt - a.updatedAt).forEach(report => {
+    reports
+        .sort((a, b) => (b.title || '').localeCompare((a.title || ''), 'zh-TW', { numeric: true, sensitivity: 'base' }))
+        .forEach(report => {
         const li = document.createElement('li');
         li.className = report.id === currentReportId ? 'active' : '';
 
