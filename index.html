@@ -111,6 +111,12 @@
             <button id="btn-save" class="btn btn-success">
               <i class="fa-solid fa-floppy-disk"></i> 儲存
             </button>
+            <button id="btn-backup" class="btn btn-secondary">
+              <i class="fa-solid fa-file-arrow-down"></i> 備份所有週報
+            </button>
+            <button id="btn-restore" class="btn btn-secondary">
+              <i class="fa-solid fa-file-arrow-up"></i> 還原週報資料
+            </button>
             <button id="btn-export-md" class="btn btn-secondary">
               <i class="fa-solid fa-file-code"></i> 匯出 MD
             </button>
@@ -139,6 +145,7 @@
         </div>
       </main>
     </div>
+    <input id="backup-file-input" type="file" accept=".json,application/json" hidden />
     <script src="script.js"></script>
   </body>
 </html>

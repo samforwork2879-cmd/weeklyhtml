@@ -33,8 +33,11 @@ const htmlPreview = document.getElementById('html-preview');
 
 const btnNew = document.getElementById('btn-new');
 const btnSave = document.getElementById('btn-save');
+const btnBackup = document.getElementById('btn-backup');
+const btnRestore = document.getElementById('btn-restore');
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportHtml = document.getElementById('btn-export-html');
+const backupFileInput = document.getElementById('backup-file-input');
 // const btnImageFolder = document.getElementById('btn-image-folder');
 const themeToggle = document.getElementById('theme-toggle');
 const colorButtons = document.querySelectorAll('.color-btn');
@@ -79,6 +82,9 @@ function init() {
     });
 
     reportTitle.addEventListener('input', updateCurrentDraft);
+    btnBackup.addEventListener('click', exportBackupFile);
+    btnRestore.addEventListener('click', () => backupFileInput.click());
+    backupFileInput.addEventListener('change', handleBackupFileSelected);
     colorButtons.forEach(button => {
         button.addEventListener('click', () => wrapSelectionWithColor(button.dataset.color));
     });
@@ -173,6 +179,65 @@ function saveReport() {
         saveToLocalStorage();
         renderReportList();
         alert('儲存成功！');
+    }
+}
+
+function exportBackupFile() {
+    const backup = buildBackupPayload();
+    downloadFile(JSON.stringify(backup, null, 2), 'weekly_reports_backup.json', 'application/json');
+}
+
+async function handleBackupFileSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const backup = JSON.parse(text);
+        restoreFromBackup(backup);
+        alert('還原完成！');
+    } catch (error) {
+        console.error('還原備份失敗。', error);
+        alert('還原失敗：請確認這是正確的 weekly_reports_backup.json 檔案。');
+    }
+}
+
+function buildBackupPayload() {
+    return {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        reports,
+        theme: localStorage.getItem(THEME_KEY) || document.documentElement.dataset.theme || 'light',
+        currentReportId
+    };
+}
+
+function restoreFromBackup(backup) {
+    const restoredReports = Array.isArray(backup?.reports) ? backup.reports : null;
+    if (!restoredReports) {
+        throw new Error('備份檔缺少 reports 陣列');
+    }
+
+    reports = restoredReports;
+
+    const restoredTheme = backup.theme === 'dark' ? 'dark' : 'light';
+    localStorage.setItem(THEME_KEY, restoredTheme);
+    document.documentElement.dataset.theme = restoredTheme;
+    updateThemeIcon(restoredTheme);
+
+    const restoredCurrentId = reports.some(report => report.id === backup.currentReportId)
+        ? backup.currentReportId
+        : reports[0]?.id || null;
+
+    currentReportId = restoredCurrentId;
+    saveToLocalStorage();
+    renderReportList();
+
+    if (currentReportId) {
+        loadReport(currentReportId);
+    } else {
+        createNewReport();
     }
 }
 
