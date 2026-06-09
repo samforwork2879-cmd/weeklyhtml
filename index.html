@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>工作週報紀錄系統</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+Mono+TC&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <!-- 引入 Marked.js 用於解析 Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@18.0.5/lib/marked.umd.min.js"></script>
+    <!-- 引入 Font Awesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- 左側：歷史週報列表 -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2><i class="fa-solid fa-book"></i> 歷史週報</h2>
+          <button id="theme-toggle" class="btn-icon" title="切換深淺色主題">
+            <i class="fa-solid fa-moon"></i>
+          </button>
+        </div>
+        <button id="btn-new" class="btn btn-primary">
+          <i class="fa-solid fa-plus"></i> 新增週報
+        </button>
+        <ul id="report-list"></ul>
+      </aside>
+
+      <!-- 右側：編輯與預覽區域 -->
+      <main class="main-content">
+        <header class="editor-header">
+          <input
+            type="text"
+            id="report-title"
+            placeholder="請輸入週報標題 (必填)"
+          />
+          <div class="tag-section">
+            <div id="tag-container" class="tag-container"></div>
+            <input
+              type="text"
+              id="tag-input"
+              placeholder="輸入標籤後按 Enter"
+            />
+          </div>
+        </header>
+
+        <!-- 工具列：顏色快捷鍵與操作按鈕 -->
+        <div class="toolbar">
+          <div class="color-tools">
+            <span class="tool-label"
+              ><i class="fa-solid fa-palette"></i> 文字顏色：</span
+            >
+            <button
+              class="color-btn btn-red"
+              data-color="#ef4444"
+              title="紅色"
+            ></button>
+            <button
+              class="color-btn btn-blue"
+              data-color="#3b82f6"
+              title="藍色"
+            ></button>
+            <button
+              class="color-btn btn-green"
+              data-color="#22c55e"
+              title="綠色"
+            ></button>
+            <button
+              class="color-btn btn-orange"
+              data-color="#f97316"
+              title="橘色"
+            ></button>
+            <button
+              id="btn-clear-color"
+              class="btn-text-tool"
+              title="清除顏色格式"
+            >
+              清除格式
+            </button>
+          </div>
+          <div class="highlight-tools">
+            <span class="tool-label"
+              ><i class="fa-solid fa-highlighter"></i> 螢光筆：</span
+            >
+            <button
+              class="highlight-btn highlight-yellow"
+              data-highlight="yellow"
+              title="黃色螢光筆"
+            ></button>
+            <button
+              class="highlight-btn highlight-green"
+              data-highlight="green"
+              title="綠色螢光筆"
+            ></button>
+            <button
+              class="highlight-btn highlight-pink"
+              data-highlight="pink"
+              title="粉色螢光筆"
+            ></button>
+          </div>
+          <div class="actions">
+            <!-- <button id="btn-image-folder" class="btn btn-secondary" title="選擇 images 資料夾後，貼上圖片會存成檔案" visible="false">
+              <i class="fa-solid fa-folder-open"></i> 圖片資料夾
+            </button> -->
+            <button id="btn-save" class="btn btn-success">
+              <i class="fa-solid fa-floppy-disk"></i> 儲存
+            </button>
+            <button id="btn-export-md" class="btn btn-secondary">
+              <i class="fa-solid fa-file-code"></i> 匯出 MD
+            </button>
+            <button id="btn-export-html" class="btn btn-secondary">
+              <i class="fa-solid fa-file-lines"></i> 匯出 HTML
+            </button>
+          </div>
+        </div>
+
+        <!-- 工作區：左編輯、右預覽 -->
+        <div class="workspace">
+          <div class="editor-wrapper">
+            <h3>
+              <span><i class="fa-solid fa-pen"></i> 編輯器 (Markdown)</span>
+              <!-- <span id="image-folder-status" class="image-folder-status">圖片：base64</span> -->
+            </h3>
+            <textarea
+              id="markdown-input"
+              placeholder="請使用 Markdown 撰寫週報，可直接貼上圖片..."
+            ></textarea>
+          </div>
+          <div class="preview-wrapper">
+            <h3><i class="fa-solid fa-eye"></i> 即時預覽</h3>
+            <div id="html-preview" class="markdown-body"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
