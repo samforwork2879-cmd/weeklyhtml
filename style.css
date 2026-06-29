@@ -12,6 +12,17 @@
     --list-hover: #edf2ff;
     --table-header-bg: #f8fafc;
     --table-stripe: #f8fafc;
+    --code-bg: #0f172a;
+    --code-border: #1e293b;
+    --code-text: #e2e8f0;
+    --code-comment: #94a3b8;
+    --code-keyword: #93c5fd;
+    --code-string: #86efac;
+    --code-number: #fda4af;
+    --code-title: #fbbf24;
+    --code-built-in: #c4b5fd;
+    --code-attr: #67e8f9;
+    --code-tag: #f9a8d4;
 }
 
 /* 深色模式變數 */
@@ -27,6 +38,17 @@
     --list-hover: #334155;
     --table-header-bg: #334155;
     --table-stripe: #1e293b;
+    --code-bg: #020617;
+    --code-border: #334155;
+    --code-text: #e2e8f0;
+    --code-comment: #94a3b8;
+    --code-keyword: #93c5fd;
+    --code-string: #86efac;
+    --code-number: #fda4af;
+    --code-title: #fbbf24;
+    --code-built-in: #c4b5fd;
+    --code-attr: #67e8f9;
+    --code-tag: #f9a8d4;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--app-font); transition: background-color 0.2s, border-color 0.2s; }
@@ -37,32 +59,11 @@ body { background-color: var(--bg-color); color: var(--text-color); height: 100v
 .sidebar { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .sidebar h2 { font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
-#report-list { list-style: none; margin-top: 10px; overflow-y: auto; flex-grow: 1; }
-#report-list li {
-    padding: 8px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-bottom: 4px;
-    background: var(--bg-color);
-    transition: all 0.2s;
-    border: 1px solid transparent;
-    position: relative;
-    min-height: 42px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-#report-list li span {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-right: 20px;
-}
+#report-list { list-style: none; margin-top: 15px; overflow-y: auto; flex-grow: 1; }
+#report-list li { padding: 12px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; background: var(--bg-color); transition: all 0.2s; border: 1px solid transparent; position: relative;}
 #report-list li:hover { background: var(--list-hover); border-color: var(--primary-color); }
 #report-list li.active { background: var(--primary-color); color: white; }
-.delete-btn { position: absolute; right: 8px; top: 8px; background: none; border: none; color: #ef4444; cursor: pointer; display: none; }
+.delete-btn { position: absolute; right: 10px; top: 12px; background: none; border: none; color: #ef4444; cursor: pointer; display: none; }
 #report-list li:hover .delete-btn, #report-list li:focus-within .delete-btn { display: block; }
 #report-list li.active .delete-btn { color: white; }
 
@@ -126,7 +127,39 @@ body { background-color: var(--bg-color); color: var(--text-color); height: 100v
 .markdown-body ul, .markdown-body ol { padding-left: 20px; margin-bottom: 15px; }
 .markdown-body p { margin-bottom: 12px; }
 .markdown-body code { background: var(--bg-color); padding: 2px 5px; border-radius: 4px; font-family: var(--app-font); font-size: 0.9em; }
+.markdown-body pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 14px; overflow: auto; margin: 0 0 16px; }
+.markdown-body pre code { background: transparent; padding: 0; color: var(--code-text); }
+.markdown-body .code-block { margin: 0 0 16px; border: 1px solid var(--code-border); border-radius: 8px; overflow: hidden; background: var(--code-bg); }
+.markdown-body .code-row { display: grid; grid-template-columns: 3.25rem 1fr; align-items: stretch; }
+.markdown-body .code-row + .code-row { border-top: 1px solid rgba(255,255,255,0.06); }
+.markdown-body .code-line-number { display: flex; align-items: flex-start; justify-content: flex-end; padding: 10px 12px; color: var(--code-comment); background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.06); user-select: none; font-size: 0.88rem; }
+.markdown-body .code-line { display: block; padding: 10px 14px; white-space: pre; overflow-x: auto; color: var(--code-text); font-family: var(--app-font); font-size: 0.92rem; }
+.markdown-body .code-line.hljs { background: transparent; }
+.markdown-body .hljs-comment,
+.markdown-body .hljs-quote { color: var(--code-comment); font-style: italic; }
+.markdown-body .hljs-keyword,
+.markdown-body .hljs-selector-tag,
+.markdown-body .hljs-literal,
+.markdown-body .hljs-type { color: var(--code-keyword); }
+.markdown-body .hljs-string,
+.markdown-body .hljs-doctag { color: var(--code-string); }
+.markdown-body .hljs-number,
+.markdown-body .hljs-regexp,
+.markdown-body .hljs-symbol,
+.markdown-body .hljs-bullet { color: var(--code-number); }
+.markdown-body .hljs-title,
+.markdown-body .hljs-section { color: var(--code-title); }
+.markdown-body .hljs-built_in,
+.markdown-body .hljs-builtin-name { color: var(--code-built-in); }
+.markdown-body .hljs-attr,
+.markdown-body .hljs-attribute { color: var(--code-attr); }
+.markdown-body .hljs-tag,
+.markdown-body .hljs-name { color: var(--code-tag); }
 .markdown-body img { display: block; max-width: 100%; height: auto; margin: 12px 0; border-radius: 6px; border: 1px solid var(--border-color); }
+.markdown-body li > input[type="checkbox"] { margin-right: 8px; transform: translateY(1px); accent-color: var(--primary-color); }
+.markdown-body li.task-list-item { list-style: none; }
+.markdown-body ul.task-list, .markdown-body ol.task-list { list-style: none; padding-left: 0; }
+.markdown-body li.task-list-item > p { display: inline; margin: 0; }
 .markdown-body .mark-yellow { background: linear-gradient(transparent 38%, rgba(254, 240, 138, 0.95) 38%); color: inherit; padding: 0 2px; }
 .markdown-body .mark-green { background: linear-gradient(transparent 38%, rgba(187, 247, 208, 0.95) 38%); color: inherit; padding: 0 2px; }
 .markdown-body .mark-pink { background: linear-gradient(transparent 38%, rgba(251, 207, 232, 0.95) 38%); color: inherit; padding: 0 2px; }
