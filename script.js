@@ -7,20 +7,147 @@ let currentReportId = null;
 let currentTags = [];
 
 const markedApi = window.marked;
+const hljsApi = window.hljs;
 
 // === 安全相容的 Markdown 解析器 ===
 function parseMarkdown(text) {
     try {
-        if (markedApi && typeof markedApi.parse === 'function') {
-            return markedApi.parse(text);
-        }
-        if (typeof markedApi === 'function') {
-            return markedApi(text);
-        }
+        const taskSafeText = normalizeTaskListSyntax(text);
+        const codeSafeText = normalizeCodeFenceLanguage(taskSafeText);
+        const rendered = markedApi && typeof markedApi.parse === 'function'
+            ? markedApi.parse(codeSafeText)
+            : typeof markedApi === 'function'
+                ? markedApi(codeSafeText)
+                : escapeHtml(codeSafeText).replace(/\n/g, '<br>');
+        return postProcessRenderedHtml(rendered);
     } catch (e) {
         console.error("Markdown 解析出錯:", e);
     }
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    return postProcessRenderedHtml(escapeHtml(normalizeCodeFenceLanguage(normalizeTaskListSyntax(text))).replace(/\n/g, '<br>'));
+}
+
+function normalizeTaskListSyntax(text) {
+    return String(text).replace(/^(\s*[-*+]\s*)\[( |x|X)\]\s*(.*)$/gm, (match, prefix, state, content) => {
+        const checked = state.toLowerCase() === 'x' ? ' checked' : '';
+        return `${prefix}<input type="checkbox" disabled${checked}> ${content}`;
+    });
+}
+
+function normalizeCodeFenceLanguage(text) {
+    const languageMap = {
+        'c#': 'csharp',
+        'csharp': 'csharp',
+        'c++': 'cpp',
+        'cpp': 'cpp',
+        'js': 'javascript',
+        'ts': 'typescript',
+        'py': 'python',
+    };
+
+    return String(text).replace(/^```(?:\s*language\s*=\s*([^\s`]+)|\s+([^\s`]+))\s*$/gim, (match, eqLang, plainLang) => {
+        const raw = String(eqLang || plainLang || '').trim().toLowerCase();
+        const normalized = languageMap[raw] || raw.replace(/[^a-z0-9+-]+/g, '');
+        return normalized ? `\`\`\`${normalized}` : '```';
+    });
+}
+
+function postProcessRenderedHtml(html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html);
+
+    template.content.querySelectorAll('li').forEach(li => {
+        if (li.querySelector('input[type="checkbox"][disabled]')) {
+            li.classList.add('task-list-item');
+            const list = li.parentElement;
+            if (list) {
+                list.classList.add('task-list');
+            }
+        }
+    });
+
+    template.content.querySelectorAll('pre > code').forEach(codeEl => {
+        const preEl = codeEl.parentElement;
+        if (!preEl) return;
+
+        const rawLanguage = Array.from(codeEl.classList)
+            .find(className => className.startsWith('language-'))
+            ?.slice('language-'.length) || '';
+        const language = normalizeHighlightLanguage(rawLanguage);
+        const source = codeEl.textContent.replace(/\n$/, '');
+        const lines = source.split(/\r?\n/);
+        const block = document.createElement('div');
+        block.className = 'code-block';
+
+        if (language) {
+            block.dataset.language = language;
+        }
+
+        if (lines.length === 0) {
+            lines.push('');
+        }
+
+        lines.forEach((line, index) => {
+            const row = document.createElement('div');
+            row.className = 'code-row';
+
+            const number = document.createElement('span');
+            number.className = 'code-line-number';
+            number.textContent = String(index + 1);
+
+            const code = document.createElement('code');
+            code.className = 'code-line hljs';
+            if (language) {
+                code.classList.add(`language-${language}`);
+            }
+            code.innerHTML = highlightCodeLine(line, language);
+
+            row.append(number, code);
+            block.appendChild(row);
+        });
+
+        preEl.replaceWith(block);
+    });
+
+    template.content.querySelectorAll('li.task-list-item > p').forEach(p => {
+        p.style.display = 'inline';
+        p.style.margin = '0';
+    });
+
+    return template.innerHTML;
+}
+
+function normalizeHighlightLanguage(language) {
+    const languageMap = {
+        'c#': 'csharp',
+        'csharp': 'csharp',
+        'c++': 'cpp',
+        'cpp': 'cpp',
+        'js': 'javascript',
+        'ts': 'typescript',
+        'py': 'python',
+        'language=c#': 'csharp',
+        'language=c++': 'cpp',
+        'language=js': 'javascript',
+        'language=ts': 'typescript',
+        'language=py': 'python',
+    };
+
+    const raw = String(language || '').trim().toLowerCase();
+    return languageMap[raw] || raw.replace(/[^a-z0-9+-]+/g, '');
+}
+
+function highlightCodeLine(line, language) {
+    const text = line ?? '';
+
+    if (hljsApi && language && typeof hljsApi.getLanguage === 'function' && hljsApi.getLanguage(language)) {
+        try {
+            return hljsApi.highlight(text, { language, ignoreIllegals: true }).value || '&nbsp;';
+        } catch (e) {
+            console.error('Code highlight failed:', e);
+        }
+    }
+
+    return escapeHtml(text || ' ');
 }
 
 // DOM 元素
@@ -33,12 +160,8 @@ const htmlPreview = document.getElementById('html-preview');
 
 const btnNew = document.getElementById('btn-new');
 const btnSave = document.getElementById('btn-save');
-const btnBackup = document.getElementById('btn-backup');
-const btnRestore = document.getElementById('btn-restore');
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportHtml = document.getElementById('btn-export-html');
-const backupFileInput = document.getElementById('backup-file-input');
-// const btnImageFolder = document.getElementById('btn-image-folder');
 const themeToggle = document.getElementById('theme-toggle');
 const colorButtons = document.querySelectorAll('.color-btn');
 const highlightButtons = document.querySelectorAll('.highlight-btn');
@@ -82,9 +205,6 @@ function init() {
     });
 
     reportTitle.addEventListener('input', updateCurrentDraft);
-    btnBackup.addEventListener('click', exportBackupFile);
-    btnRestore.addEventListener('click', () => backupFileInput.click());
-    backupFileInput.addEventListener('change', handleBackupFileSelected);
     colorButtons.forEach(button => {
         button.addEventListener('click', () => wrapSelectionWithColor(button.dataset.color));
     });
@@ -92,7 +212,6 @@ function init() {
         button.addEventListener('click', () => wrapSelectionWithHighlight(button.dataset.highlight));
     });
     btnClearColor.addEventListener('click', clearSelectedColor);
-    // btnImageFolder.addEventListener('click', chooseImageFolder);
     markdownInput.addEventListener('paste', handleImagePaste);
     themeToggle.addEventListener('click', toggleTheme);
     updateImageFolderStatus();
@@ -101,9 +220,7 @@ function init() {
 // 渲染左側列表
 function renderReportList() {
     reportList.innerHTML = '';
-    reports
-        .sort((a, b) => (b.title || '').localeCompare((a.title || ''), 'zh-TW', { numeric: true, sensitivity: 'base' }))
-        .forEach(report => {
+    reports.sort((a, b) => b.updatedAt - a.updatedAt).forEach(report => {
         const li = document.createElement('li');
         li.className = report.id === currentReportId ? 'active' : '';
 
@@ -179,65 +296,6 @@ function saveReport() {
         saveToLocalStorage();
         renderReportList();
         alert('儲存成功！');
-    }
-}
-
-function exportBackupFile() {
-    const backup = buildBackupPayload();
-    downloadFile(JSON.stringify(backup, null, 2), 'weekly_reports_backup.json', 'application/json');
-}
-
-async function handleBackupFileSelected(event) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
-    try {
-        const text = await file.text();
-        const backup = JSON.parse(text);
-        restoreFromBackup(backup);
-        alert('還原完成！');
-    } catch (error) {
-        console.error('還原備份失敗。', error);
-        alert('還原失敗：請確認這是正確的 weekly_reports_backup.json 檔案。');
-    }
-}
-
-function buildBackupPayload() {
-    return {
-        schemaVersion: 1,
-        exportedAt: new Date().toISOString(),
-        reports,
-        theme: localStorage.getItem(THEME_KEY) || document.documentElement.dataset.theme || 'light',
-        currentReportId
-    };
-}
-
-function restoreFromBackup(backup) {
-    const restoredReports = Array.isArray(backup?.reports) ? backup.reports : null;
-    if (!restoredReports) {
-        throw new Error('備份檔缺少 reports 陣列');
-    }
-
-    reports = restoredReports;
-
-    const restoredTheme = backup.theme === 'dark' ? 'dark' : 'light';
-    localStorage.setItem(THEME_KEY, restoredTheme);
-    document.documentElement.dataset.theme = restoredTheme;
-    updateThemeIcon(restoredTheme);
-
-    const restoredCurrentId = reports.some(report => report.id === backup.currentReportId)
-        ? backup.currentReportId
-        : reports[0]?.id || null;
-
-    currentReportId = restoredCurrentId;
-    saveToLocalStorage();
-    renderReportList();
-
-    if (currentReportId) {
-        loadReport(currentReportId);
-    } else {
-        createNewReport();
     }
 }
 
@@ -529,6 +587,17 @@ function getExportThemeCss(theme) {
     const listHover = isDark ? '#334155' : '#edf2ff';
     const tableHeaderBg = isDark ? '#334155' : '#f8fafc';
     const tableStripe = isDark ? '#1e293b' : '#f8fafc';
+    const codeBg = isDark ? '#020617' : '#0f172a';
+    const codeBorder = isDark ? '#334155' : '#1e293b';
+    const codeText = '#e2e8f0';
+    const codeComment = '#94a3b8';
+    const codeKeyword = '#93c5fd';
+    const codeString = '#86efac';
+    const codeNumber = '#fda4af';
+    const codeTitle = '#fbbf24';
+    const codeBuiltIn = '#c4b5fd';
+    const codeAttr = '#67e8f9';
+    const codeTag = '#f9a8d4';
 
     return `
         :root {
@@ -544,6 +613,17 @@ function getExportThemeCss(theme) {
             --list-hover: ${listHover};
             --table-header-bg: ${tableHeaderBg};
             --table-stripe: ${tableStripe};
+            --code-bg: ${codeBg};
+            --code-border: ${codeBorder};
+            --code-text: ${codeText};
+            --code-comment: ${codeComment};
+            --code-keyword: ${codeKeyword};
+            --code-string: ${codeString};
+            --code-number: ${codeNumber};
+            --code-title: ${codeTitle};
+            --code-built-in: ${codeBuiltIn};
+            --code-attr: ${codeAttr};
+            --code-tag: ${codeTag};
         }
         body {
             font-family: var(--app-font);
@@ -577,15 +657,92 @@ function getExportThemeCss(theme) {
             font-size: 0.92em;
         }
         pre {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
             border-radius: 8px;
             padding: 14px;
             overflow: auto;
+            margin: 0 0 16px;
         }
         pre code {
             background: transparent;
             padding: 0;
+            color: var(--code-text);
+        }
+        .code-block {
+            margin: 0 0 16px;
+            border: 1px solid var(--code-border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--code-bg);
+        }
+        .code-row {
+            display: grid;
+            grid-template-columns: 3.25rem 1fr;
+            align-items: stretch;
+        }
+        .code-row + .code-row {
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .code-line-number {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            padding: 10px 12px;
+            color: var(--code-comment);
+            background: rgba(255,255,255,0.03);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            user-select: none;
+            font-size: 0.88rem;
+        }
+        .code-line {
+            display: block;
+            padding: 10px 14px;
+            white-space: pre;
+            overflow-x: auto;
+            color: var(--code-text);
+            font-family: var(--app-font);
+            font-size: 0.92rem;
+        }
+        .code-line.hljs {
+            background: transparent;
+        }
+        .hljs-comment,
+        .hljs-quote {
+            color: var(--code-comment);
+            font-style: italic;
+        }
+        .hljs-keyword,
+        .hljs-selector-tag,
+        .hljs-literal,
+        .hljs-type {
+            color: var(--code-keyword);
+        }
+        .hljs-string,
+        .hljs-doctag {
+            color: var(--code-string);
+        }
+        .hljs-number,
+        .hljs-regexp,
+        .hljs-symbol,
+        .hljs-bullet {
+            color: var(--code-number);
+        }
+        .hljs-title,
+        .hljs-section {
+            color: var(--code-title);
+        }
+        .hljs-built_in,
+        .hljs-builtin-name {
+            color: var(--code-built-in);
+        }
+        .hljs-attr,
+        .hljs-attribute {
+            color: var(--code-attr);
+        }
+        .hljs-tag,
+        .hljs-name {
+            color: var(--code-tag);
         }
         table {
             width: 100%;
@@ -611,6 +768,18 @@ function getExportThemeCss(theme) {
         tr:hover {
             background: var(--list-hover);
         }
+        li.task-list-item {
+            list-style: none;
+        }
+        ul.task-list,
+        ol.task-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        li.task-list-item > p {
+            display: inline;
+            margin: 0;
+        }
         img {
             display: block;
             max-width: 100%;
@@ -618,6 +787,11 @@ function getExportThemeCss(theme) {
             margin: 12px 0;
             border-radius: 6px;
             border: 1px solid var(--border-color);
+        }
+        li > input[type="checkbox"] {
+            margin-right: 8px;
+            transform: translateY(1px);
+            accent-color: var(--primary-color);
         }
         mark.mark-yellow {
             background: linear-gradient(transparent 38%, rgba(254, 240, 138, 0.95) 38%);
@@ -652,7 +826,6 @@ function getExportThemeCss(theme) {
 btnNew.addEventListener('click', createNewReport);
 btnSave.addEventListener('click', saveReport);
 
-// 4. 匯出功能實作
 function downloadFile(content, fileName, contentType) {
     const a = document.createElement("a");
     const file = new Blob([content], { type: contentType });

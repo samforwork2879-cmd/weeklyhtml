@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="style.css" />
     <!-- 引入 Marked.js 用於解析 Markdown -->
     <script src="https://cdn.jsdelivr.net/npm/marked@18.0.5/lib/marked.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
     <!-- 引入 Font Awesome 圖示 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
   </head>
@@ -105,17 +106,8 @@
             ></button>
           </div>
           <div class="actions">
-            <!-- <button id="btn-image-folder" class="btn btn-secondary" title="選擇 images 資料夾後，貼上圖片會存成檔案" visible="false">
-              <i class="fa-solid fa-folder-open"></i> 圖片資料夾
-            </button> -->
             <button id="btn-save" class="btn btn-success">
               <i class="fa-solid fa-floppy-disk"></i> 儲存
-            </button>
-            <button id="btn-backup" class="btn btn-secondary">
-              <i class="fa-solid fa-file-arrow-down"></i> 備份所有週報
-            </button>
-            <button id="btn-restore" class="btn btn-secondary">
-              <i class="fa-solid fa-file-arrow-up"></i> 還原週報資料
             </button>
             <button id="btn-export-md" class="btn btn-secondary">
               <i class="fa-solid fa-file-code"></i> 匯出 MD
@@ -131,7 +123,6 @@
           <div class="editor-wrapper">
             <h3>
               <span><i class="fa-solid fa-pen"></i> 編輯器 (Markdown)</span>
-              <!-- <span id="image-folder-status" class="image-folder-status">圖片：base64</span> -->
             </h3>
             <textarea
               id="markdown-input"
@@ -139,13 +130,12 @@
             ></textarea>
           </div>
           <div class="preview-wrapper">
-            <h3><span><i class="fa-solid fa-eye"></i> 即時預覽</span></h3>
+            <h3><i class="fa-solid fa-eye"></i> 即時預覽</h3>
             <div id="html-preview" class="markdown-body"></div>
           </div>
         </div>
       </main>
     </div>
-    <input id="backup-file-input" type="file" accept=".json,application/json" hidden />
     <script src="script.js"></script>
   </body>
 </html>
