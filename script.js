@@ -8,6 +8,13 @@ let currentTags = [];
 
 const markedApi = window.marked;
 const hljsApi = window.hljs;
+let toastContainer = null;
+let autosaveTimerId = null;
+let jsonBackupTimerId = null;
+let hasUnsavedChanges = false;
+
+const AUTOSAVE_INTERVAL_MS = 5 * 60 * 1000;
+const JSON_BACKUP_INTERVAL_MS = 60 * 60 * 1000;
 
 // === 安全相容的 Markdown 解析器 ===
 function parseMarkdown(text) {
@@ -164,14 +171,18 @@ const btnExportJson = document.getElementById('btn-export-json');
 const btnImportJson = document.getElementById('btn-import-json');
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportHtml = document.getElementById('btn-export-html');
+const btnChooseBackupFolder = document.getElementById('btn-choose-backup-folder');
 const importJsonInput = document.getElementById('import-json-input');
 const themeToggle = document.getElementById('theme-toggle');
 const colorButtons = document.querySelectorAll('.color-btn');
 const highlightButtons = document.querySelectorAll('.highlight-btn');
 const btnClearColor = document.getElementById('btn-clear-color');
 const imageFolderStatus = document.getElementById('image-folder-status');
+const backupFolderStatus = document.getElementById('backup-folder-status');
 
 let imageDirectoryHandle = null;
+let backupBaseDirectoryHandle = null;
+let backupDirectoryHandle = null;
 
 if (markedApi && typeof markedApi.setOptions === 'function') {
     markedApi.setOptions({
@@ -186,6 +197,7 @@ if (markedApi && typeof markedApi.setOptions === 'function') {
 init();
 
 function init() {
+    ensureToastContainer();
     applySavedTheme();
     renderReportList();
     if (reports.length > 0) {
@@ -197,6 +209,7 @@ function init() {
     // 監聽輸入即時預覽
     markdownInput.addEventListener('input', () => {
         updatePreview();
+        markDraftDirty();
     });
 
     // 監聽標籤輸入
@@ -207,7 +220,10 @@ function init() {
         }
     });
 
-    reportTitle.addEventListener('input', updateCurrentDraft);
+    reportTitle.addEventListener('input', () => {
+        updateCurrentDraft();
+        markDraftDirty();
+    });
     colorButtons.forEach(button => {
         button.addEventListener('click', () => wrapSelectionWithColor(button.dataset.color));
     });
@@ -219,8 +235,12 @@ function init() {
     themeToggle.addEventListener('click', toggleTheme);
     btnExportJson.addEventListener('click', exportReportsJson);
     btnImportJson.addEventListener('click', triggerImportJson);
+    btnChooseBackupFolder.addEventListener('click', chooseBackupFolder);
     importJsonInput.addEventListener('change', handleImportJsonFile);
+    autosaveTimerId = window.setInterval(autoSaveCurrentReport, AUTOSAVE_INTERVAL_MS);
+    jsonBackupTimerId = window.setInterval(autoBackupReports, JSON_BACKUP_INTERVAL_MS);
     updateImageFolderStatus();
+    updateBackupFolderStatus();
 }
 
 // 渲染左側列表
@@ -269,12 +289,17 @@ function createNewReport() {
     reports.push(newReport);
     saveToLocalStorage();
     currentReportId = newReport.id;
+    hasUnsavedChanges = false;
     renderReportList();
     loadReport(newReport.id);
 }
 
 // 載入指定週報
 function loadReport(id) {
+    if (currentReportId && currentReportId !== id && hasUnsavedChanges) {
+        persistCurrentReport(false);
+    }
+
     currentReportId = id;
     const report = reports.find(r => r.id === id);
     if (!report) return;
@@ -285,6 +310,7 @@ function loadReport(id) {
     
     renderTags();
     updatePreview();
+    hasUnsavedChanges = false;
     
     // 更新左側 active 狀態
     document.querySelectorAll('#report-list li').forEach(li => li.classList.remove('active'));
@@ -293,15 +319,8 @@ function loadReport(id) {
 
 // 儲存週報
 function saveReport() {
-    const report = reports.find(r => r.id === currentReportId);
-    if (report) {
-        report.title = reportTitle.value;
-        report.content = markdownInput.value;
-        report.tags = currentTags;
-        report.updatedAt = Date.now();
-        saveToLocalStorage();
-        renderReportList();
-        alert('儲存成功！');
+    if (persistCurrentReport(false)) {
+        showToast('儲存成功！', 'success');
     }
 }
 
@@ -346,6 +365,7 @@ function addTag(tag) {
         currentTags.push(tag);
         renderTags();
         updateCurrentDraft();
+        markDraftDirty();
     }
 }
 
@@ -353,6 +373,7 @@ function removeTag(index) {
     currentTags.splice(index, 1);
     renderTags();
     updateCurrentDraft();
+    markDraftDirty();
 }
 
 function loadReports() {
@@ -368,9 +389,11 @@ function loadReports() {
 function saveToLocalStorage() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+        return true;
     } catch (e) {
         console.error('週報儲存失敗。', e);
-        alert('儲存失敗：資料量可能太大。若貼上了大型圖片，請先壓縮圖片後再貼上。');
+        showToast('儲存失敗：資料量可能太大。若貼上了大型圖片，請先壓縮圖片後再貼上。', 'error', 4500);
+        return false;
     }
 }
 
@@ -384,6 +407,63 @@ function updateCurrentDraft() {
     report.title = reportTitle.value;
     report.content = markdownInput.value;
     report.tags = [...currentTags];
+}
+
+function markDraftDirty() {
+    if (currentReportId) {
+        hasUnsavedChanges = true;
+    }
+}
+
+function persistCurrentReport(showSuccessToast = false) {
+    const report = reports.find(r => r.id === currentReportId);
+    if (!report) return false;
+
+    updateCurrentDraft();
+    report.updatedAt = Date.now();
+    if (!saveToLocalStorage()) {
+        return false;
+    }
+    renderReportList();
+    hasUnsavedChanges = false;
+
+    if (showSuccessToast) {
+        showToast('儲存成功！', 'success');
+    }
+
+    return true;
+}
+
+function autoSaveCurrentReport() {
+    if (!hasUnsavedChanges || !currentReportId) return;
+    persistCurrentReport(false);
+}
+
+function ensureToastContainer() {
+    if (toastContainer) return toastContainer;
+
+    toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container';
+    toastContainer.setAttribute('aria-live', 'polite');
+    toastContainer.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(toastContainer);
+    return toastContainer;
+}
+
+function showToast(message, type = 'success', duration = 3000) {
+    const container = ensureToastContainer();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    const dismiss = () => {
+        toast.classList.add('toast-hide');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    };
+
+    window.setTimeout(dismiss, duration);
+    return toast;
 }
 
 function wrapSelectionWithColor(color) {
@@ -430,6 +510,7 @@ function clearSelectedColor() {
     markdownInput.focus();
     updatePreview();
     updateCurrentDraft();
+    markDraftDirty();
 }
 
 async function handleImagePaste(event) {
@@ -483,6 +564,29 @@ async function chooseImageFolder() {
     }
 }
 
+async function chooseBackupFolder() {
+    if (!window.showDirectoryPicker) {
+        alert('目前瀏覽器不支援直接寫入資料夾。請使用最新版 Chrome 或 Edge 開啟此頁。');
+        return;
+    }
+
+    try {
+        backupBaseDirectoryHandle = await window.showDirectoryPicker({
+            id: 'weekly-report-json-backups',
+            mode: 'readwrite'
+        });
+        backupDirectoryHandle = null;
+        await ensureBackupDirectoryHandle();
+        updateBackupFolderStatus();
+        showToast('已啟用 json備份 自動備份資料夾。', 'success');
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error('選擇 JSON 備份資料夾失敗。', e);
+            alert('選擇 JSON 備份資料夾失敗，請確認瀏覽器允許檔案系統權限。');
+        }
+    }
+}
+
 function updateImageFolderStatus() {
     if (!imageFolderStatus) return;
     if (imageDirectoryHandle) {
@@ -493,6 +597,86 @@ function updateImageFolderStatus() {
 
     imageFolderStatus.textContent = '圖片：base64';
     imageFolderStatus.classList.remove('ready');
+}
+
+function updateBackupFolderStatus() {
+    if (!backupFolderStatus) return;
+    if (backupDirectoryHandle) {
+        backupFolderStatus.textContent = '備份：json備份';
+        backupFolderStatus.classList.add('ready');
+        return;
+    }
+
+    backupFolderStatus.textContent = '備份：未設定';
+    backupFolderStatus.classList.remove('ready');
+}
+
+async function ensureBackupDirectoryHandle() {
+    if (!backupBaseDirectoryHandle) {
+        return null;
+    }
+
+    const permission = await backupBaseDirectoryHandle.requestPermission({ mode: 'readwrite' });
+    if (permission !== 'granted') {
+        throw new Error('未取得 JSON 備份資料夾寫入權限');
+    }
+
+    if (backupBaseDirectoryHandle.name === 'json備份') {
+        backupDirectoryHandle = backupBaseDirectoryHandle;
+        return backupDirectoryHandle;
+    }
+
+    backupDirectoryHandle = await backupBaseDirectoryHandle.getDirectoryHandle('json備份', { create: true });
+    return backupDirectoryHandle;
+}
+
+function buildJsonBackupFileName() {
+    const randomPart = String(Math.floor(Math.random() * 900000) + 100000);
+    const now = new Date();
+    const datePart = now.getFullYear()
+        + String(now.getMonth() + 1).padStart(2, '0')
+        + String(now.getDate()).padStart(2, '0');
+    const timePart = String(now.getHours()).padStart(2, '0')
+        + String(now.getMinutes()).padStart(2, '0')
+        + String(now.getSeconds()).padStart(2, '0');
+    return `${randomPart}_${datePart}_${timePart}.json`;
+}
+
+async function writeJsonBackupFile(fileName, content) {
+    const directoryHandle = await ensureBackupDirectoryHandle();
+    if (!directoryHandle) {
+        return false;
+    }
+
+    const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return true;
+}
+
+async function autoBackupReports() {
+    if (!backupBaseDirectoryHandle || !currentReportId) {
+        return;
+    }
+
+    try {
+        if (hasUnsavedChanges) {
+            const saved = persistCurrentReport(false);
+            if (!saved) {
+                return;
+            }
+        }
+
+        const payload = buildExportPayload();
+        const fileName = buildJsonBackupFileName();
+        const content = JSON.stringify(payload, null, 2);
+        await writeJsonBackupFile(fileName, content);
+        console.info(`JSON 自動備份完成：json備份/${fileName}`);
+    } catch (e) {
+        console.error('JSON 自動備份失敗。', e);
+        showToast('JSON 自動備份失敗，請重新設定備份資料夾。', 'error', 4500);
+    }
 }
 
 async function saveImageFile(fileName, file) {
@@ -537,6 +721,7 @@ function insertAtCursor(text) {
     markdownInput.focus();
     updatePreview();
     updateCurrentDraft();
+    markDraftDirty();
 }
 
 function applySavedTheme() {
@@ -880,7 +1065,7 @@ async function handleImportJsonFile(event) {
         const imported = normalizeImportedReportPayload(parsed);
 
         if (!imported.reports.length) {
-            alert('這個 JSON 沒有可匯入的週報資料。');
+            showToast('這個 JSON 沒有可匯入的週報資料。', 'warning', 3500);
             return;
         }
 
@@ -903,10 +1088,10 @@ async function handleImportJsonFile(event) {
             updateThemeIcon(imported.theme);
         }
 
-        alert('匯入成功！');
+        showToast('匯入成功！', 'success');
     } catch (error) {
         console.error('JSON 匯入失敗:', error);
-        alert('匯入失敗，請確認檔案格式是否正確。');
+        showToast('匯入失敗，請確認檔案格式是否正確。', 'error', 4500);
     } finally {
         event.target.value = '';
     }
