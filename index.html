@@ -109,11 +109,17 @@
             <button id="btn-save" class="btn btn-success">
               <i class="fa-solid fa-floppy-disk"></i> 儲存
             </button>
+            <button id="btn-export-json" class="btn btn-secondary">
+              <i class="fa-solid fa-file-export"></i> 匯出 JSON
+            </button>
+            <button id="btn-import-json" class="btn btn-secondary">
+              <i class="fa-solid fa-file-import"></i> 匯入 JSON
+            </button>
             <button id="btn-export-md" class="btn btn-secondary">
               <i class="fa-solid fa-file-code"></i> 匯出 MD
             </button>
             <button id="btn-export-html" class="btn btn-secondary">
-              <i class="fa-solid fa-file-lines"></i> 匯出 HTML
+              <i class="fa-solid fa-file-lines"></i> 下載 HTML
             </button>
           </div>
         </div>
@@ -136,6 +142,7 @@
         </div>
       </main>
     </div>
+    <input id="import-json-input" type="file" accept=".json,application/json" hidden />
     <script src="script.js"></script>
   </body>
 </html>

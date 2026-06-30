@@ -160,8 +160,11 @@ const htmlPreview = document.getElementById('html-preview');
 
 const btnNew = document.getElementById('btn-new');
 const btnSave = document.getElementById('btn-save');
+const btnExportJson = document.getElementById('btn-export-json');
+const btnImportJson = document.getElementById('btn-import-json');
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportHtml = document.getElementById('btn-export-html');
+const importJsonInput = document.getElementById('import-json-input');
 const themeToggle = document.getElementById('theme-toggle');
 const colorButtons = document.querySelectorAll('.color-btn');
 const highlightButtons = document.querySelectorAll('.highlight-btn');
@@ -214,6 +217,9 @@ function init() {
     btnClearColor.addEventListener('click', clearSelectedColor);
     markdownInput.addEventListener('paste', handleImagePaste);
     themeToggle.addEventListener('click', toggleTheme);
+    btnExportJson.addEventListener('click', exportReportsJson);
+    btnImportJson.addEventListener('click', triggerImportJson);
+    importJsonInput.addEventListener('change', handleImportJsonFile);
     updateImageFolderStatus();
 }
 
@@ -832,7 +838,97 @@ function downloadFile(content, fileName, contentType) {
     a.href = URL.createObjectURL(file);
     a.download = fileName;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
+}
+
+function buildExportPayload() {
+    updateCurrentDraft();
+    return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        currentReportId,
+        theme: document.documentElement.dataset.theme || 'light',
+        reports: reports.map(report => ({
+            id: String(report.id || ''),
+            title: String(report.title || ''),
+            content: String(report.content || ''),
+            tags: Array.isArray(report.tags) ? report.tags.map(tag => String(tag)) : [],
+            updatedAt: Number(report.updatedAt) || Date.now()
+        }))
+    };
+}
+
+function exportReportsJson() {
+    const payload = buildExportPayload();
+    const fileName = `weekly_reports_${new Date().toISOString().slice(0, 10)}.json`;
+    downloadFile(JSON.stringify(payload, null, 2), fileName, 'application/json');
+}
+
+function triggerImportJson() {
+    if (!importJsonInput) return;
+    importJsonInput.value = '';
+    importJsonInput.click();
+}
+
+async function handleImportJsonFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const imported = normalizeImportedReportPayload(parsed);
+
+        if (!imported.reports.length) {
+            alert('這個 JSON 沒有可匯入的週報資料。');
+            return;
+        }
+
+        if (!confirm(`確認要匯入 ${imported.reports.length} 筆週報嗎？這會覆蓋目前瀏覽器內的資料。`)) {
+            return;
+        }
+
+        reports = imported.reports;
+        currentReportId = imported.currentReportId && reports.some(report => report.id === imported.currentReportId)
+            ? imported.currentReportId
+            : reports[0].id;
+        currentTags = [];
+        saveToLocalStorage();
+        renderReportList();
+        loadReport(currentReportId);
+
+        if (imported.theme === 'dark' || imported.theme === 'light') {
+            document.documentElement.dataset.theme = imported.theme;
+            localStorage.setItem(THEME_KEY, imported.theme);
+            updateThemeIcon(imported.theme);
+        }
+
+        alert('匯入成功！');
+    } catch (error) {
+        console.error('JSON 匯入失敗:', error);
+        alert('匯入失敗，請確認檔案格式是否正確。');
+    } finally {
+        event.target.value = '';
+    }
+}
+
+function normalizeImportedReportPayload(payload) {
+    const source = Array.isArray(payload) ? { reports: payload } : (payload || {});
+    const reportsSource = Array.isArray(source.reports) ? source.reports : [];
+
+    return {
+        currentReportId: typeof source.currentReportId === 'string' ? source.currentReportId : null,
+        theme: source.theme,
+        reports: reportsSource
+            .filter(item => item && typeof item === 'object')
+            .map(item => ({
+                id: String(item.id || `rep_${Date.now()}_${Math.random().toString(16).slice(2)}`),
+                title: String(item.title || '未命名週報'),
+                content: String(item.content || ''),
+                tags: Array.isArray(item.tags) ? item.tags.map(tag => String(tag)).filter(Boolean) : [],
+                updatedAt: Number(item.updatedAt) || Date.now()
+            }))
+    };
 }
 
 // 匯出為 .md 檔案
