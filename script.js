@@ -282,7 +282,7 @@ function createNewReport() {
     const newReport = {
         id: 'rep_' + Date.now(),
         title: new Date().toLocaleDateString(),
-        content: '|**負責人員**|**項目**|**重要工作 / 說明**|**本週進度 / 問題點**|\n|-|-|-|-|\n|||||',
+        content: '|**項目**|**本週進度 / 問題點**|\n|-|-|\n|||',
         tags: [],
         updatedAt: Date.now()
     };
