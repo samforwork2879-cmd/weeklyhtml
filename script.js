@@ -15,22 +15,152 @@ let hasUnsavedChanges = false;
 
 const AUTOSAVE_INTERVAL_MS = 5 * 60 * 1000;
 const JSON_BACKUP_INTERVAL_MS = 60 * 60 * 1000;
+const INFO_BLOCK_OPEN_PATTERN = /^\s*:::\s*info(?:\s*:::\s*)?(?:\s+(.*))?\s*$/i;
+const INFO_BLOCK_CLOSE_PATTERN = /^\s*:::\s*$/;
+const CODE_FENCE_OPEN_PATTERN = /^\s*(`{3,}|~{3,})(.*)$/;
 
 // === 安全相容的 Markdown 解析器 ===
 function parseMarkdown(text) {
     try {
         const taskSafeText = normalizeTaskListSyntax(text);
         const codeSafeText = normalizeCodeFenceLanguage(taskSafeText);
-        const rendered = markedApi && typeof markedApi.parse === 'function'
-            ? markedApi.parse(codeSafeText)
-            : typeof markedApi === 'function'
-                ? markedApi(codeSafeText)
-                : escapeHtml(codeSafeText).replace(/\n/g, '<br>');
+        const rendered = renderMarkdownWithCustomBlocks(codeSafeText);
         return postProcessRenderedHtml(rendered);
     } catch (e) {
         console.error("Markdown 解析出錯:", e);
     }
     return postProcessRenderedHtml(escapeHtml(normalizeCodeFenceLanguage(normalizeTaskListSyntax(text))).replace(/\n/g, '<br>'));
+}
+
+function renderMarkdownWithCustomBlocks(text) {
+    return splitMarkdownSegments(String(text)).map(segment => {
+        if (segment.type === 'info') {
+            return renderInfoBlock(segment.title, segment.content);
+        }
+
+        return renderMarkdownFragment(segment.content);
+    }).join('\n');
+}
+
+function renderMarkdownFragment(text) {
+    if (markedApi && typeof markedApi.parse === 'function') {
+        return markedApi.parse(String(text));
+    }
+
+    return typeof markedApi === 'function'
+        ? markedApi(String(text))
+        : escapeHtml(String(text)).replace(/\n/g, '<br>');
+}
+
+function splitMarkdownSegments(text) {
+    const lines = String(text).split(/\r?\n/);
+    const segments = [];
+    let textBuffer = [];
+    let infoBuffer = [];
+    let infoTitle = '';
+    let infoStartLine = '';
+    let inInfoBlock = false;
+    let codeFenceMarker = '';
+    let codeFenceTarget = '';
+
+    const flushTextBuffer = () => {
+        if (!textBuffer.length) return;
+        segments.push({
+            type: 'text',
+            content: textBuffer.join('\n')
+        });
+        textBuffer = [];
+    };
+
+    const flushInfoBuffer = () => {
+        segments.push({
+            type: 'info',
+            title: infoTitle,
+            content: infoBuffer.join('\n')
+        });
+        infoBuffer = [];
+        infoTitle = '';
+    };
+
+    for (const line of lines) {
+        if (codeFenceMarker) {
+            if (codeFenceTarget === 'info') {
+                infoBuffer.push(line);
+            } else {
+                textBuffer.push(line);
+            }
+            if (isClosingCodeFence(line, codeFenceMarker)) {
+                codeFenceMarker = '';
+                codeFenceTarget = '';
+            }
+            continue;
+        }
+
+        const fenceMatch = line.match(CODE_FENCE_OPEN_PATTERN);
+        if (fenceMatch) {
+            if (inInfoBlock) {
+                infoBuffer.push(line);
+                codeFenceTarget = 'info';
+            } else {
+                textBuffer.push(line);
+                codeFenceTarget = 'text';
+            }
+            codeFenceMarker = fenceMatch[1];
+            continue;
+        }
+
+        if (inInfoBlock) {
+            if (INFO_BLOCK_CLOSE_PATTERN.test(line)) {
+                flushInfoBuffer();
+                inInfoBlock = false;
+            } else {
+                infoBuffer.push(line);
+            }
+            continue;
+        }
+
+        const infoMatch = line.match(INFO_BLOCK_OPEN_PATTERN);
+        if (infoMatch) {
+            flushTextBuffer();
+            inInfoBlock = true;
+            infoTitle = (infoMatch[1] || '').trim();
+            infoStartLine = line;
+            continue;
+        }
+
+        textBuffer.push(line);
+    }
+
+    if (inInfoBlock) {
+        textBuffer.push(infoStartLine || `:::info${infoTitle ? ` ${infoTitle}` : ''}`);
+        if (infoBuffer.length) {
+            textBuffer.push(...infoBuffer);
+        }
+    }
+
+    flushTextBuffer();
+    return segments;
+}
+
+function isClosingCodeFence(line, marker) {
+    return new RegExp(`^\\s*${escapeRegExp(marker)}\\s*$`).test(line);
+}
+
+function renderInfoBlock(title, content) {
+    const infoTitle = escapeHtml(title || 'Info');
+    const renderedContent = renderMarkdownFragment(content);
+
+    return `
+        <section class="md-info-block">
+            <div class="md-info-header">
+                <span class="md-info-pill">INFO</span>
+                <span class="md-info-title">${infoTitle}</span>
+            </div>
+            <div class="md-info-content">
+                ${renderedContent}
+            </div>
+        </section>
+    `;
 }
 
 function normalizeTaskListSyntax(text) {
@@ -761,6 +891,10 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function escapeMarkdownAlt(value) {
     return String(value).replace(/[\[\]\\]/g, '');
 }
@@ -789,6 +923,10 @@ function getExportThemeCss(theme) {
     const codeBuiltIn = '#c4b5fd';
     const codeAttr = '#67e8f9';
     const codeTag = '#f9a8d4';
+    const infoBg = isDark ? 'rgba(251, 146, 60, 0.10)' : '#fff7ed';
+    const infoBorder = isDark ? 'rgba(251, 146, 60, 0.45)' : '#fdba74';
+    const infoAccent = isDark ? '#fb923c' : '#f97316';
+    const infoHeaderBg = isDark ? 'rgba(251, 146, 60, 0.16)' : 'rgba(249, 115, 22, 0.12)';
 
     return `
         :root {
@@ -815,6 +953,10 @@ function getExportThemeCss(theme) {
             --code-built-in: ${codeBuiltIn};
             --code-attr: ${codeAttr};
             --code-tag: ${codeTag};
+            --info-bg: ${infoBg};
+            --info-border: ${infoBorder};
+            --info-accent: ${infoAccent};
+            --info-header-bg: ${infoHeaderBg};
         }
         body {
             font-family: var(--app-font);
@@ -995,6 +1137,44 @@ function getExportThemeCss(theme) {
         mark.mark-pink {
             background: linear-gradient(transparent 38%, rgba(251, 207, 232, 0.95) 38%);
             padding: 0 2px;
+        }
+        .md-info-block {
+            margin: 0 0 16px;
+            border: 1px solid var(--info-border);
+            border-left: 4px solid var(--info-accent);
+            border-radius: 10px;
+            overflow: hidden;
+            background: var(--info-bg);
+        }
+        .md-info-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--info-header-bg);
+            border-bottom: 1px solid var(--info-border);
+        }
+        .md-info-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: var(--info-accent);
+            color: #fff;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .md-info-title {
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        .md-info-content {
+            padding: 12px 14px;
+        }
+        .md-info-content > :last-child {
+            margin-bottom: 0;
         }
         .meta {
             color: var(--text-light);
