@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08111f">
+  <title>Markdown to DOCX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #050816;
+      --bg-1: #0b1220;
+      --bg-2: #0f172a;
+      --line: rgba(148, 163, 184, 0.18);
+      --line-strong: rgba(148, 163, 184, 0.28);
+      --text: #e5eefb;
+      --muted: #9ca8bc;
+      --accent: #7dd3fc;
+      --accent-2: #a7f3d0;
+      --accent-3: #f9a8d4;
+      --shadow: 0 24px 80px rgba(2, 6, 23, 0.5);
+    }
+
+    html, body {
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 10% 10%, rgba(125, 211, 252, 0.18), transparent 22%),
+        radial-gradient(circle at 90% 12%, rgba(167, 243, 208, 0.12), transparent 18%),
+        radial-gradient(circle at 80% 88%, rgba(249, 168, 212, 0.10), transparent 18%),
+        linear-gradient(160deg, var(--bg-0) 0%, var(--bg-1) 42%, var(--bg-2) 100%);
+      color: var(--text);
+    }
+
+    body {
+      font-family: "Noto Sans TC", sans-serif;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.55;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::before {
+      width: 320px;
+      height: 320px;
+      top: -80px;
+      left: -120px;
+      background: rgba(56, 189, 248, 0.16);
+    }
+
+    body::after {
+      width: 260px;
+      height: 260px;
+      right: -100px;
+      bottom: 40px;
+      background: rgba(34, 197, 94, 0.10);
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      padding: 32px 0 44px;
+    }
+
+    .glass {
+      background: rgba(8, 16, 32, 0.72);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      border-radius: 32px;
+      overflow: hidden;
+    }
+
+    .hero-title {
+      font-family: "Noto Serif TC", serif;
+      letter-spacing: -0.03em;
+      line-height: 1.02;
+    }
+
+    .hero-lead {
+      color: rgba(226, 232, 240, 0.82);
+      line-height: 1.8;
+      max-width: 62ch;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .55rem .9rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(15, 23, 42, 0.58);
+      color: #d8e7fb;
+      font-size: .92rem;
+      white-space: nowrap;
+    }
+
+    .badge-soft {
+      color: #cde4ff;
+      background: rgba(125, 211, 252, 0.10);
+      border: 1px solid rgba(125, 211, 252, 0.24);
+    }
+
+    .panel {
+      border-radius: 26px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 1rem 1.1rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .panel-body {
+      padding: 1.15rem;
+    }
+
+    .editor {
+      height: 72vh;
+      min-height: 720px;
+      resize: vertical;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(2, 6, 23, 0.72);
+      color: var(--text);
+      padding: 1rem 1rem;
+      font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+      font-size: .95rem;
+      line-height: 1.2;
+      outline: none;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.01);
+    }
+
+    .form-control.editor,
+    .form-control.editor:focus {
+      background: rgba(2, 6, 23, 0.72);
+      color: var(--text);
+    }
+
+    .editor:focus,
+    .file-input:focus {
+      border-color: rgba(125, 211, 252, 0.55);
+      box-shadow: 0 0 0 .2rem rgba(125, 211, 252, 0.12);
+    }
+
+    .file-input {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px dashed rgba(148, 163, 184, 0.28);
+      color: var(--muted);
+      border-radius: 16px;
+      padding: .9rem .95rem;
+    }
+
+    .preview-wrap {
+      min-height: 380px;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+        rgba(2, 6, 23, 0.52);
+      padding: 1rem;
+      overflow: auto;
+    }
+
+    .preview-empty {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      color: rgba(226, 232, 240, 0.58);
+      text-align: center;
+      padding: 2rem;
+      border-radius: 16px;
+      border: 1px dashed rgba(148, 163, 184, 0.18);
+      background: rgba(15, 23, 42, 0.35);
+    }
+
+    .preview-content {
+      color: #e2e8f0;
+      font-size: .99rem;
+      line-height: 1.8;
+    }
+
+    .preview-content h1,
+    .preview-content h2,
+    .preview-content h3,
+    .preview-content h4,
+    .preview-content h5,
+    .preview-content h6 {
+      font-family: "Noto Serif TC", serif;
+      letter-spacing: -0.02em;
+      margin-top: 1.4rem;
+      margin-bottom: .7rem;
+    }
+
+    .preview-content h1 { font-size: clamp(1.8rem, 3vw, 2.6rem); }
+    .preview-content h2 { font-size: clamp(1.5rem, 2.4vw, 2.05rem); }
+    .preview-content h3 { font-size: 1.35rem; }
+    .preview-content p { margin-bottom: .85rem; }
+
+    .preview-content a {
+      color: #7dd3fc;
+      text-decoration-thickness: 2px;
+      text-underline-offset: .18em;
+    }
+
+    .preview-content blockquote {
+      margin: 1rem 0;
+      padding: .9rem 1rem;
+      border-left: 4px solid rgba(125, 211, 252, 0.65);
+      background: rgba(14, 165, 233, 0.08);
+      border-radius: 0 14px 14px 0;
+      color: #dbeafe;
+    }
+
+    .preview-content pre {
+      padding: 1rem;
+      border-radius: 16px;
+      background: #030712;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      color: #e2e8f0;
+      overflow: auto;
+    }
+
+    .preview-content code {
+      background: rgba(15, 23, 42, 0.9);
+      color: #c7f9ff;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 8px;
+      padding: .12rem .35rem;
+      font-size: .95em;
+    }
+
+    .preview-content pre code {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+    }
+
+    .preview-content table {
+      width: 100%;
+      margin: 1rem 0;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .preview-content th,
+    .preview-content td {
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      padding: .72rem .8rem;
+      vertical-align: top;
+    }
+
+    .preview-content th {
+      background: rgba(125, 211, 252, 0.12);
+      color: #eff6ff;
+      font-weight: 700;
+    }
+
+    .preview-content tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .preview-content ul,
+    .preview-content ol {
+      padding-left: 1.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .preview-content hr {
+      border-color: rgba(148, 163, 184, 0.24);
+      opacity: 1;
+      margin: 1.25rem 0;
+    }
+
+    .message {
+      border-radius: 18px;
+      border: 1px solid rgba(248, 113, 113, 0.26);
+      background: rgba(127, 29, 29, 0.28);
+      color: #fecaca;
+      padding: .9rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-size: .9rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .btn-accent {
+      --bs-btn-color: #02111f;
+      --bs-btn-bg: #7dd3fc;
+      --bs-btn-border-color: #7dd3fc;
+      /* --bs-btn-hover-bg: #97defc; */
+      --bs-btn-hover-border-color: #97defc;
+      --bs-btn-font-weight: 800;
+      box-shadow: 0 14px 30px rgba(125, 211, 252, 0.2);
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    .stat {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(15, 23, 42, 0.42);
+      padding: .9rem 1rem;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.05rem;
+      color: #f8fafc;
+      margin-top: .25rem;
+    }
+
+    .animate-pop {
+      animation: pop .35s ease-out both;
+    }
+
+    @keyframes pop {
+      from { transform: translateY(8px); opacity: .2; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @media (max-width: 991.98px) {
+      .app-shell { padding-top: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <div class="container">
+      <section class="hero glass p-4 p-lg-5 mb-4 animate-pop">
+        <div class="row align-items-center g-4">
+          <div class="col-lg-7">
+            <h1 class="hero-title display-5 fw-bold mb-3">Markdown 轉 DOCX</h1>
+            <p class="hero-lead mb-0">
+              可以上傳 `.mk` 或 `.md` 檔案，或直接貼上 Markdown 語法，下方會同步預覽渲染結果，最後一鍵下載 Word `.docx`。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="row g-4">
+        <div class="col-xl-12">
+          <div class="panel glass h-100 animate-pop">
+            <div class="panel-header d-flex align-items-center justify-content-between gap-3">
+              <div>
+                <div class="section-title">Input</div>
+                <div class="fw-bold text-white">Markdown 編輯區</div>
+              </div>
+              <button id="convertBtn" class="btn btn-accent btn-lg px-4" type="button">下載 DOCX</button>
+            </div>
+            <div class="panel-body">
+              <div class="mb-3">
+                <label for="fileInput" class="form-label fw-semibold text-white">上傳 Markdown 檔案</label>
+                <input id="fileInput" class="form-control file-input" type="file" accept=".mk,.md,.markdown,text/markdown,text/plain">
+                <div class="small-note mt-2">可上傳 `.mk`、`.md`、`.markdown`，或直接貼上內容。</div>
+              </div>
+              <div class="mb-0">
+                <label for="markdownInput" class="form-label fw-semibold text-white">貼上 Markdown</label>
+                <textarea id="markdownInput" class="form-control editor" spellcheck="false" placeholder=""></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-12">
+          <div class="panel glass h-100 animate-pop">
+            <div class="panel-header">
+              <div class="section-title">Preview</div>
+              <div class="fw-bold text-white">渲染預覽</div>
+            </div>
+            <div class="panel-body">
+              <div id="previewWrap" class="preview-wrap">
+                <div id="emptyState" class="preview-empty">
+                  <div>
+                    <div class="h4 mb-2 fw-bold">等待 Markdown 內容</div>
+                    <div class="small-note">
+                      在上方貼上內容或上傳檔案後，這裡會即時顯示渲染成果。
+                    </div>
+                  </div>
+                </div>
+                <article id="preview" class="preview-content d-none"></article>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+    const md = window.markdownit({
+      html: true,
+      linkify: true,
+      breaks: true,
+      typographer: true
+    });
+
+    const {
+      AlignmentType,
+      Document,
+      ExternalHyperlink,
+      HeadingLevel,
+      Paragraph,
+      Packer,
+      Table,
+      TableCell,
+      TableRow,
+      TextRun,
+      WidthType
+    } = docx;
+
+    const WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const DOC_FONT = "LXGW WenKai Mono TC";
+    const DOC_SIZE = 24;
+
+    const markdownInput = document.getElementById("markdownInput");
+    const fileInput = document.getElementById("fileInput");
+    const preview = document.getElementById("preview");
+    const previewWrap = document.getElementById("previewWrap");
+    const emptyState = document.getElementById("emptyState");
+    const convertBtn = document.getElementById("convertBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    let currentFileBase = "markdown";
+    let renderTimer = null;
+
+    function escapeFilename(name) {
+      return (name || "markdown")
+        .trim()
+        .replace(/\.[^.]+$/, "")
+        .replace(/[^\w\-\u4e00-\u9fff]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "markdown";
+    }
+
+    function sanitizePreview(root) {
+      root.querySelectorAll("script, iframe, object, embed").forEach((node) => node.remove());
+    }
+
+    function renderPreview() {
+      const source = markdownInput.value || "";
+      if (!source.trim()) {
+        preview.classList.add("d-none");
+        emptyState.classList.remove("d-none");
+        preview.innerHTML = "";
+        return;
+      }
+
+      preview.innerHTML = md.render(source);
+      sanitizePreview(preview);
+      preview.classList.remove("d-none");
+      emptyState.classList.add("d-none");
+    }
+
+    function scheduleRender() {
+      window.clearTimeout(renderTimer);
+      renderTimer = window.setTimeout(renderPreview, 60);
+    }
+
+    function textRunFromState(text, state = {}) {
+      return new TextRun({
+        text,
+        font: DOC_FONT,
+        size: DOC_SIZE,
+        bold: !!state.bold,
+        italics: !!state.italic,
+        strike: !!state.strike,
+        underline: state.underline ? {} : undefined,
+        color: state.code ? "334155" : undefined
+      });
+    }
+
+    function isBlockTag(tagName) {
+      return ["P", "DIV", "SECTION", "ARTICLE", "ASIDE", "BLOCKQUOTE", "PRE", "TABLE", "UL", "OL", "H1", "H2", "H3", "H4", "H5", "H6", "HR"].includes(tagName);
+    }
+
+    function convertInline(node, state = {}) {
+      const runs = [];
+
+      for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const raw = child.textContent || "";
+          if (!state.code) {
+            const pieces = raw.replace(/\s+/g, " ").split("\n");
+            pieces.forEach((piece, index) => {
+              if (piece) runs.push(textRunFromState(piece, state));
+              if (index < pieces.length - 1) {
+                runs.push(new TextRun({ break: 1 }));
+              }
+            });
+          } else {
+            if (raw) {
+              runs.push(textRunFromState(raw, state));
+            }
+          }
+          continue;
+        }
+
+        if (child.nodeType !== Node.ELEMENT_NODE) {
+          continue;
+        }
+
+        const tag = child.tagName;
+        if (tag === "BR") {
+          runs.push(new TextRun({ break: 1 }));
+        } else if (tag === "STRONG" || tag === "B") {
+          runs.push(...convertInline(child, { ...state, bold: true }));
+        } else if (tag === "EM" || tag === "I") {
+          runs.push(...convertInline(child, { ...state, italic: true }));
+        } else if (tag === "CODE") {
+          runs.push(...convertInline(child, { ...state, code: true }));
+        } else if (tag === "U") {
+          runs.push(...convertInline(child, { ...state, underline: true }));
+        } else if (tag === "DEL" || tag === "S") {
+          runs.push(...convertInline(child, { ...state, strike: true }));
+        } else if (tag === "A") {
+          const href = child.getAttribute("href") || "";
+          const label = (child.textContent || href).trim() || href;
+          runs.push(
+            new ExternalHyperlink({
+              link: href,
+              children: [
+                new TextRun({
+                  text: label,
+                  font: DOC_FONT,
+                  size: DOC_SIZE,
+                  style: "Hyperlink"
+                })
+              ]
+            })
+          );
+        } else {
+          runs.push(...convertInline(child, state));
+        }
+      }
+
+      return runs;
+    }
+
+    function convertParagraphFromElement(element, options = {}) {
+      const runs = convertInline(element, options.state || {});
+      return new Paragraph({
+        children: runs.length ? runs : [new TextRun({ text: "", font: DOC_FONT, size: DOC_SIZE })],
+        alignment: options.alignment || AlignmentType.LEFT,
+        indent: options.indent || undefined,
+        spacing: options.spacing || { after: 160 }
+      });
+    }
+
+    function convertList(listElement, depth = 0) {
+      const children = [];
+      let index = 1;
+
+      for (const li of listElement.children) {
+        if (li.tagName !== "LI") {
+          continue;
+        }
+
+        const lead = document.createElement("div");
+        const rest = [];
+        let seenBlock = false;
+
+        for (const child of li.childNodes) {
+          if (child.nodeType === Node.ELEMENT_NODE && isBlockTag(child.tagName) && child.tagName !== "P") {
+            seenBlock = true;
+            rest.push(child);
+            continue;
+          }
+
+          if (child.nodeType === Node.ELEMENT_NODE && child.tagName === "P" && !seenBlock && !lead.childNodes.length) {
+            for (const grandChild of child.childNodes) {
+              lead.appendChild(grandChild.cloneNode(true));
+            }
+            continue;
+          }
+
+          if (!seenBlock) {
+            lead.appendChild(child.cloneNode(true));
+          } else {
+            rest.push(child);
+          }
+        }
+
+        const prefix = listElement.tagName === "OL" ? `${index}. ` : "• ";
+        const listParagraph = new Paragraph({
+          children: [
+            new TextRun({ text: prefix, bold: true, font: DOC_FONT, size: DOC_SIZE }),
+            ...convertInline(lead)
+          ],
+          indent: { left: 720 + depth * 360 },
+          spacing: { after: 90 }
+        });
+        children.push(listParagraph);
+
+        for (const block of rest) {
+          children.push(...convertNode(block, depth + 1));
+        }
+
+        index += 1;
+      }
+
+      return children;
+    }
+
+    function convertTable(table) {
+      const rows = [];
+      const rowElements = table.querySelectorAll("tr");
+      for (const tr of rowElements) {
+        const cells = [];
+        for (const cell of tr.children) {
+          const isHeader = cell.tagName === "TH";
+          cells.push(
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: convertInline(cell, { bold: isHeader }),
+                  spacing: { after: 0 }
+                })
+              ]
+            })
+          );
+        }
+        rows.push(new TableRow({ children: cells }));
+      }
+
+      return [
+        new Table({
+          rows,
+          width: { size: 100, type: WidthType.PERCENTAGE }
+        })
+      ];
+    }
+
+    function convertNode(node, depth = 0) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = (node.textContent || "").trim();
+        if (!text) return [];
+        return [new Paragraph({ children: [new TextRun({ text, font: DOC_FONT, size: DOC_SIZE })], spacing: { after: 160 } })];
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return [];
+      }
+
+      const tag = node.tagName;
+      if (/^H[1-6]$/.test(tag)) {
+        return [convertParagraphFromElement(node, {
+          state: { bold: true },
+          spacing: { before: 200, after: 120 }
+        })];
+      }
+
+      if (tag === "P") {
+        return [convertParagraphFromElement(node, { spacing: { after: 160 } })];
+      }
+
+      if (tag === "BLOCKQUOTE") {
+        return [convertParagraphFromElement(node, {
+          state: { italic: true },
+          indent: { left: 720 },
+          spacing: { before: 120, after: 120 }
+        })];
+      }
+
+      if (tag === "PRE") {
+        const code = node.innerText.replace(/\r\n/g, "\n").replace(/\n+$/, "");
+        const lines = code.split("\n");
+        return lines.map((line, index) => new Paragraph({
+          children: [new TextRun({ text: line, font: DOC_FONT, size: DOC_SIZE })],
+          spacing: { after: index === lines.length - 1 ? 120 : 0, before: 60 },
+          indent: { left: 360 }
+        }));
+      }
+
+      if (tag === "UL" || tag === "OL") {
+        return convertList(node, depth);
+      }
+
+      if (tag === "TABLE") {
+        return convertTable(node);
+      }
+
+      if (tag === "HR") {
+        return [new Paragraph({
+          children: [new TextRun({ text: "────────────────────────────────", color: "64748b", font: DOC_FONT, size: DOC_SIZE })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 180, after: 180 }
+        })];
+      }
+
+      if (tag === "IMG") {
+        const alt = node.getAttribute("alt") || "image";
+        return [new Paragraph({ children: [new TextRun({ text: `[圖片：${alt}]`, font: DOC_FONT, size: DOC_SIZE })], spacing: { after: 160 } })];
+      }
+
+      if (tag === "DIV" || tag === "SECTION" || tag === "ARTICLE" || tag === "ASIDE" || tag === "BODY") {
+        const children = [];
+        for (const child of node.childNodes) {
+          children.push(...convertNode(child, depth));
+        }
+        return children;
+      }
+
+      return [convertParagraphFromElement(node, { spacing: { after: 160 } })];
+    }
+
+    function createDocChildrenFromPreview() {
+      const children = [];
+      for (const node of preview.childNodes) {
+        children.push(...convertNode(node));
+      }
+      return children;
+    }
+
+    function deriveBaseName() {
+      const headline = preview.querySelector("h1, h2");
+      const source = headline ? headline.textContent : (currentFileBase || "markdown");
+      return escapeFilename(source);
+    }
+
+    function setLandscapeOnDocumentXml(xmlText) {
+      const parser = new DOMParser();
+      const serializer = new XMLSerializer();
+      const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+      const parseError = xmlDoc.getElementsByTagName("parsererror")[0];
+      if (parseError) {
+        throw new Error("無法調整 Word 版面配置。");
+      }
+
+      const sectPrNodes = Array.from(xmlDoc.getElementsByTagName("w:sectPr"));
+      if (!sectPrNodes.length) {
+        return xmlText;
+      }
+
+      sectPrNodes.forEach((sectPr) => {
+        let pgSz = sectPr.getElementsByTagNameNS(WORD_NS, "pgSz")[0];
+        if (!pgSz) {
+          pgSz = xmlDoc.createElementNS(WORD_NS, "w:pgSz");
+          sectPr.insertBefore(pgSz, sectPr.firstChild);
+        }
+        pgSz.setAttributeNS(WORD_NS, "w:w", "16838");
+        pgSz.setAttributeNS(WORD_NS, "w:h", "11906");
+        pgSz.setAttributeNS(WORD_NS, "w:orient", "landscape");
+      });
+
+      return serializer.serializeToString(xmlDoc);
+    }
+
+    async function downloadDocx() {
+      const source = markdownInput.value || "";
+      if (!source.trim()) {
+        alert("請先輸入或上傳 Markdown 內容。");
+        return;
+      }
+
+      renderPreview();
+
+      const doc = new Document({
+        sections: [
+          {
+            children: createDocChildrenFromPreview()
+          }
+        ]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+      const documentXml = await zip.file("word/document.xml").async("string");
+      zip.file("word/document.xml", setLandscapeOnDocumentXml(documentXml));
+      const finalBlob = await zip.generateAsync({ type: "blob" });
+
+      const url = URL.createObjectURL(finalBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${deriveBaseName()}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+
+      currentFileBase = escapeFilename(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        markdownInput.value = String(reader.result || "");
+        scheduleRender();
+      };
+      reader.readAsText(file);
+    });
+
+    markdownInput.addEventListener("input", scheduleRender);
+    convertBtn.addEventListener("click", downloadDocx);
+    clearBtn.addEventListener("click", () => {
+      markdownInput.value = "";
+      fileInput.value = "";
+      currentFileBase = "markdown";
+      renderPreview();
+      markdownInput.focus();
+    });
+
+    renderPreview();
+  </script>
+</body>
+</html>
