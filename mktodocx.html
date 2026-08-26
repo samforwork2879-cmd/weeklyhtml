@@ -384,7 +384,12 @@
               </div>
               <div class="mb-0">
                 <label for="markdownInput" class="form-label fw-semibold text-white">貼上 Markdown</label>
-                <textarea id="markdownInput" class="form-control editor" spellcheck="false" placeholder=""></textarea>
+                <textarea id="markdownInput" class="form-control editor" spellcheck="false">## 工作進度報告
+
+<div style="display: flex; justify-content: space-between;">
+    <span>期間：2026年月日~ 2026年月日</span>
+    <span>報告人：李承翰</span>
+</div></textarea>
               </div>
             </div>
           </div>
@@ -444,6 +449,7 @@
     const WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     const DOC_FONT = "LXGW WenKai Mono TC";
     const DOC_SIZE = 24;
+    const DOC_MARGIN = 720;
 
     const markdownInput = document.getElementById("markdownInput");
     const fileInput = document.getElementById("fileInput");
@@ -468,8 +474,17 @@
       root.querySelectorAll("script, iframe, object, embed").forEach((node) => node.remove());
     }
 
+    function normalizeMarkdownSource(source) {
+      const trimmed = (source || "").trim();
+      const fenceMatch = trimmed.match(/^```[^\n]*\n([\s\S]*?)\n```$/);
+      if (fenceMatch) {
+        return fenceMatch[1].replace(/^\s+|\s+$/g, "");
+      }
+      return source;
+    }
+
     function renderPreview() {
-      const source = markdownInput.value || "";
+      const source = normalizeMarkdownSource(markdownInput.value || "");
       if (!source.trim()) {
         preview.classList.add("d-none");
         emptyState.classList.remove("d-none");
@@ -492,13 +507,59 @@
       return new TextRun({
         text,
         font: DOC_FONT,
-        size: DOC_SIZE,
+        size: state.size || DOC_SIZE,
         bold: !!state.bold,
         italics: !!state.italic,
         strike: !!state.strike,
         underline: state.underline ? {} : undefined,
         color: state.code ? "334155" : undefined
       });
+    }
+
+    function textRunFromText(text, size = DOC_SIZE, state = {}) {
+      return new TextRun({
+        text,
+        font: DOC_FONT,
+        size,
+        bold: !!state.bold,
+        italics: !!state.italic,
+        strike: !!state.strike,
+        underline: state.underline ? {} : undefined,
+        color: state.code ? "334155" : undefined
+      });
+    }
+
+    function extractDirectText(node) {
+      return (node.textContent || "").replace(/\s+/g, " ").trim();
+    }
+
+    function buildFlexBlockParagraph(node) {
+      const directSpans = Array.from(node.children).filter((child) => child.tagName === "SPAN");
+      const items = directSpans.length ? directSpans : Array.from(node.childNodes).filter((child) => child.nodeType === Node.ELEMENT_NODE);
+
+      if (items.length < 2) {
+        return null;
+      }
+
+      const leftNode = items[0];
+      const rightNode = items[1];
+      const leftRuns = leftNode.tagName === "SPAN" ? convertInline(leftNode) : [textRunFromText(extractDirectText(leftNode))];
+      const rightRuns = rightNode.tagName === "SPAN" ? convertInline(rightNode) : [textRunFromText(extractDirectText(rightNode))];
+      return [
+        new Paragraph({
+          children: [
+            ...(leftRuns.length ? leftRuns : [textRunFromText(extractDirectText(leftNode))]),
+            new TextRun({ text: "\t", font: DOC_FONT, size: DOC_SIZE }),
+            ...(rightRuns.length ? rightRuns : [textRunFromText(extractDirectText(rightNode))])
+          ],
+          rightTabStop: 14400,
+          spacing: { after: 120 }
+        })
+      ];
+    }
+
+    function headingSizeForLevel(level) {
+      return [32, 30, 28, 26, 24, 24][Math.min(Math.max(level - 1, 0), 5)];
     }
 
     function isBlockTag(tagName) {
@@ -550,11 +611,11 @@
           runs.push(
             new ExternalHyperlink({
               link: href,
-              children: [
+                children: [
                 new TextRun({
                   text: label,
                   font: DOC_FONT,
-                  size: DOC_SIZE,
+                  size: state.size || DOC_SIZE,
                   style: "Hyperlink"
                 })
               ]
@@ -675,9 +736,15 @@
 
       const tag = node.tagName;
       if (/^H[1-6]$/.test(tag)) {
-        return [convertParagraphFromElement(node, {
-          state: { bold: true },
-          spacing: { before: 200, after: 120 }
+        const level = Number(tag.slice(1));
+        const size = headingSizeForLevel(level);
+        const runs = convertInline(node, { bold: true, size });
+        return [new Paragraph({
+          children: runs.length ? runs : [textRunFromText(extractDirectText(node), size, { bold: true })],
+          alignment: AlignmentType.LEFT,
+          spacing: { before: 200, after: 120 },
+          heading: undefined,
+          style: undefined
         })];
       }
 
@@ -725,6 +792,13 @@
       }
 
       if (tag === "DIV" || tag === "SECTION" || tag === "ARTICLE" || tag === "ASIDE" || tag === "BODY") {
+        const style = (node.getAttribute && node.getAttribute("style")) || "";
+        if (/display\s*:\s*flex/i.test(style) && /justify-content\s*:\s*space-between/i.test(style)) {
+          const block = buildFlexBlockParagraph(node);
+          if (block) {
+            return block;
+          }
+        }
         const children = [];
         for (const child of node.childNodes) {
           children.push(...convertNode(child, depth));
@@ -772,13 +846,26 @@
         pgSz.setAttributeNS(WORD_NS, "w:w", "16838");
         pgSz.setAttributeNS(WORD_NS, "w:h", "11906");
         pgSz.setAttributeNS(WORD_NS, "w:orient", "landscape");
+
+        let pgMar = sectPr.getElementsByTagNameNS(WORD_NS, "pgMar")[0];
+        if (!pgMar) {
+          pgMar = xmlDoc.createElementNS(WORD_NS, "w:pgMar");
+          sectPr.insertBefore(pgMar, pgSz.nextSibling);
+        }
+        pgMar.setAttributeNS(WORD_NS, "w:top", String(DOC_MARGIN));
+        pgMar.setAttributeNS(WORD_NS, "w:right", String(DOC_MARGIN));
+        pgMar.setAttributeNS(WORD_NS, "w:bottom", String(DOC_MARGIN));
+        pgMar.setAttributeNS(WORD_NS, "w:left", String(DOC_MARGIN));
+        pgMar.setAttributeNS(WORD_NS, "w:header", "360");
+        pgMar.setAttributeNS(WORD_NS, "w:footer", "360");
+        pgMar.setAttributeNS(WORD_NS, "w:gutter", "0");
       });
 
       return serializer.serializeToString(xmlDoc);
     }
 
     async function downloadDocx() {
-      const source = markdownInput.value || "";
+      const source = normalizeMarkdownSource(markdownInput.value || "");
       if (!source.trim()) {
         alert("請先輸入或上傳 Markdown 內容。");
         return;
@@ -789,6 +876,16 @@
       const doc = new Document({
         sections: [
           {
+            properties: {
+              page: {
+                margin: {
+                  top: DOC_MARGIN,
+                  right: DOC_MARGIN,
+                  bottom: DOC_MARGIN,
+                  left: DOC_MARGIN
+                }
+              }
+            },
             children: createDocChildrenFromPreview()
           }
         ]
