@@ -374,38 +374,79 @@ function init() {
 }
 
 // 渲染左側列表
-function renderReportList() {
-    reportList.innerHTML = '';
-    reports.sort((a, b) => b.updatedAt - a.updatedAt).forEach(report => {
-        const li = document.createElement('li');
-        li.className = report.id === currentReportId ? 'active' : '';
-
-        const title = document.createElement('span');
+function renderReportList() { 
+    reportList.innerHTML = ''; 
+    
+    // 🔍 改為依照標題 (title) 進行字串排序
+    reports.sort((a, b) => {
+        const titleA = a.title || '未命名週報';
+        const titleB = b.title || '未命名週報';
+        return titleB.localeCompare(titleA, 'zh-Hant'); // 'zh-Hant' 確保繁體中文排序符合預期
+    }).forEach(report => { 
+        const li = document.createElement('li'); 
+        li.className = report.id === currentReportId ? 'active' : ''; 
+        
+        const title = document.createElement('span'); 
+        title.textContent = report.id === currentReportId ? report.title || '未命名週報' : report.title || '未命名週報'; 
+        // 註：上一行維持你原本的預設值邏輯
         title.textContent = report.title || '未命名週報';
-
-        const deleteButton = document.createElement('button');
-        deleteButton.className = 'delete-btn';
-        deleteButton.dataset.id = report.id;
-        deleteButton.title = '刪除週報';
-        deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
-
-        li.append(title, deleteButton);
-        li.addEventListener('click', (e) => {
-            if (!e.target.closest('.delete-btn')) {
-                loadReport(report.id);
-            }
-        });
-        reportList.appendChild(li);
-    });
-
-    // 綁定刪除按鈕事件
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteReport(btn.dataset.id);
-        });
-    });
+        
+        const deleteButton = document.createElement('button'); 
+        deleteButton.className = 'delete-btn'; 
+        deleteButton.dataset.id = report.id; 
+        deleteButton.title = '刪除週報'; 
+        deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>'; 
+        
+        li.append(title, deleteButton); 
+        li.addEventListener('click', (e) => { 
+            if (!e.target.closest('.delete-btn')) { 
+                loadReport(report.id); 
+            } 
+        }); 
+        reportList.appendChild(li); 
+    }); 
+    
+    // 綁定刪除按鈕事件 
+    document.querySelectorAll('.delete-btn').forEach(btn => { 
+        btn.addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            deleteReport(btn.dataset.id); 
+        }); 
+    }); 
 }
+
+// function renderReportList() {
+//     reportList.innerHTML = '';
+//     reports.sort((a, b) => b.updatedAt - a.updatedAt).forEach(report => {
+//         const li = document.createElement('li');
+//         li.className = report.id === currentReportId ? 'active' : '';
+
+//         const title = document.createElement('span');
+//         title.textContent = report.title || '未命名週報';
+
+//         const deleteButton = document.createElement('button');
+//         deleteButton.className = 'delete-btn';
+//         deleteButton.dataset.id = report.id;
+//         deleteButton.title = '刪除週報';
+//         deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+//         li.append(title, deleteButton);
+//         li.addEventListener('click', (e) => {
+//             if (!e.target.closest('.delete-btn')) {
+//                 loadReport(report.id);
+//             }
+//         });
+//         reportList.appendChild(li);
+//     });
+
+//     // 綁定刪除按鈕事件
+//     document.querySelectorAll('.delete-btn').forEach(btn => {
+//         btn.addEventListener('click', (e) => {
+//             e.stopPropagation();
+//             deleteReport(btn.dataset.id);
+//         });
+//     });
+// }
 
 // 新增週報
 function createNewReport() {
