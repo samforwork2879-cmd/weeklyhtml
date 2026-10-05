@@ -379,9 +379,17 @@ function renderReportList() {
     
     // 🔍 改為依照標題 (title) 進行字串排序
     reports.sort((a, b) => {
-        const titleA = a.title || '未命名週報';
-        const titleB = b.title || '未命名週報';
-        return titleB.localeCompare(titleA, 'zh-Hant'); // 'zh-Hant' 確保繁體中文排序符合預期
+        const matchA = (a.title || '未命名週報').match(/^\d{4}\/\d{1,2}\/\d{1,2}/);
+        const matchB = (b.title || '未命名週報').match(/^\d{4}\/\d{1,2}\/\d{1,2}/);
+        if (matchA && matchB) {
+            return new Date(matchB[0]) - new Date(matchA[0]);    
+        }
+
+        if (matchA) return -1; // a 有日期，b 沒有日期，a 排前面
+        if (matchB) return 1;  // b 有日期，a 沒有日期，b 排前面
+
+        return (b.title || '未命名週報').localeCompare(a.title || '未命名週報', 'zh-Hant');
+        // return titleB.localeCompare(titleA, 'zh-Hant'); // 'zh-Hant' 確保繁體中文排序符合預期
     }).forEach(report => { 
         const li = document.createElement('li'); 
         li.className = report.id === currentReportId ? 'active' : ''; 
