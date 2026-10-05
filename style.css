@@ -1,5 +1,35 @@
 /* 基礎變數（淺色模式） */
 :root {
+  --app-font: 'LXGW WenKai Mono TC', 'Segoe UI', system-ui, monospace;
+  --bg-color: #f2efe9;         
+  --sidebar-bg: #e9e5db;      
+  --card-bg: #eeeceabe;         
+  --primary-color: #3b59c7;    
+  --success-color: #1b9d4b;    
+  --border-color: #dfdacd;     
+  --list-hover: #e3e9f8;       
+  --text-color: #2d3139;       
+  --text-light: #5c6470;       
+  --table-header-bg: #e3ded4;  
+  --table-stripe: #f6f4ee;    
+  --info-bg: #f9f5eb;
+  --info-border: #d4c5a9;
+  --info-accent: #8c6d3b;
+  --info-header-bg: rgba(140, 109, 59, 0.1);
+  --code-bg: #0f172a;
+  --code-border: #1e293b;
+  --code-text: #e2e8f0;
+  --code-comment: #94a3b8;
+  --code-keyword: #93c5fd;
+  --code-string: #86efac;
+  --code-number: #fda4af;
+  --code-title: #fbbf24;
+  --code-built-in: #c4b5fd;
+  --code-attr: #67e8f9;
+  --code-tag: #f9a8d4;
+}
+
+/* :root {
     --app-font: 'LXGW WenKai Mono TC', 'Segoe UI', system-ui, monospace;
     --bg-color: #f5f7fb;
     --sidebar-bg: #ffffff;
@@ -27,7 +57,7 @@
     --info-border: #fdba74;
     --info-accent: #f97316;
     --info-header-bg: rgba(249, 115, 22, 0.12);
-}
+} */
 
 /* 深色模式變數 */
 [data-theme="dark"] {
